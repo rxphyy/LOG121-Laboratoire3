@@ -1,83 +1,64 @@
 package org.example.laboratoire3;
 
 import javafx.fxml.FXML;
-import javafx.scene.Node;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
-import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
+
+import java.util.List;
 
 public class MediateurFormulairePaiement implements Mediateur {
-    private final String[] DELIVERY_OPTIONS = {
-        "Livraison en main propre",
-        "Se retrouver à l’extérieur",
-        "Laisser à la porte"
-    };
+    private final String CARD_NUMBER_REGEX = "^[0-9]{16}$"; // 16 chiffres
+    private final String EXP_DATE_REGEX = "^(0[1-9]|1[0-2])/([0-9]{2})$"; // MM/YY
+    private final String CVC_REGEX = "^[0-9]{3}$"; // 3 chiffres
+    private final String GIFT_CARD_REGEX = "^[0-9]{16}$"; // 16 chiffres
 
-    private final String CREDIT_CARD_NUM_REGEX = "^(\\d{16}|(\\d{4}-){3}\\d{4})$";
-    private final String CREDIT_CARD_EXP_REGEX = "^([0-2]?[0-9]|3[01])[-/](0[1-9]|1[0-2]|[1-9])$|^(0[1-9]|[1][0-2]|[1-9])[-/](0[1-9]|[12][0-9]|3[01]|[1-9])$";
-    private final String CREDIT_CARD_CVC_REGEX = "^(\\d{3})$";
-
-    private ChoiceBox<String> PaymentModeChoiceBox;
-    private ChoiceBox<String> DeliveryOptionChoiceBox;
-    private TitledPane CreditCardSection;
-    private TitledPane GiftCardSection;
-    private TitledPane BillingAddressSection;
+    private FormulairePaiement formulaire;
+    private CreditCardSection creditCardSection;
+    private GiftCardSection giftCardSection;
+    private BillingAddressSection billingAddressSection;
+    private DeliveryAddressSection deliveryAddressSection;
     private Label ErrorLabel;
-    private TextField CreditCardNumberField;
-    private TextField CreditCardExpirationField;
-    private TextField CreditCardCVCField;
-    private RadioButton SameAdressesCheckbox;
-    private TextField BillingAddressTextField;
-    private TextField DeliveryAddressTextField;
 
-    public MediateurFormulairePaiement(ChoiceBox<String> PaymentModeChoiceBox, ChoiceBox<String> DeliveryOptionChoiceBox, TitledPane GiftCardSection, TitledPane CreditCardSection, TitledPane BillingAddressSection, TextField CreditCardNumberField, TextField CreditCardExpirationField, TextField CreditCardCVCField, Label ErrorLabel, RadioButton SameAddressCheckbox, TextField BillingAddressTextField, TextField DeliveryAddressTextField) {
-        this.PaymentModeChoiceBox = PaymentModeChoiceBox;
-        this.DeliveryOptionChoiceBox = DeliveryOptionChoiceBox;
-        this.GiftCardSection = GiftCardSection;
-        this.CreditCardSection = CreditCardSection;
-        this.BillingAddressSection = BillingAddressSection;
-        this.CreditCardNumberField = CreditCardNumberField;
-        this.CreditCardExpirationField = CreditCardExpirationField;
-        this.CreditCardCVCField = CreditCardCVCField;
-        this.ErrorLabel = ErrorLabel;
-        this.SameAdressesCheckbox = SameAddressCheckbox;
-        this.BillingAddressTextField = BillingAddressTextField;
-        this.DeliveryAddressTextField = DeliveryAddressTextField;
-        
+    public MediateurFormulairePaiement(FormulairePaiement formulairePaiement, GiftCardSection giftCardSection, CreditCardSection creditCardSection,
+                                       DeliveryAddressSection deliveryAddressSection, BillingAddressSection billingAddressSection, Label errorLabel) {
+        this.formulaire = formulairePaiement;
+        this.giftCardSection = giftCardSection;
+        this.creditCardSection = creditCardSection;
+        this.deliveryAddressSection = deliveryAddressSection;
+        this.billingAddressSection = billingAddressSection;
+        this.ErrorLabel = errorLabel;
+
+        creditCardSection.hideSection();
+        giftCardSection.showSection();
 
         initialize();
     }
 
     @FXML
     public void initialize() {
-        // Ensure that FXML components are initialized
-        PaymentModeChoiceBox.getSelectionModel().selectedIndexProperty().addListener((ov, value, new_value) -> {
-            handlePaymentModeChange((int) new_value);
+        creditCardSection.getCreditCardNumberField().textProperty().addListener((observable, oldValue, newValue) -> {
+            validateField(creditCardSection.getCreditCardNumberField(), CARD_NUMBER_REGEX, "Numéro de carte");
         });
 
-        DeliveryOptionChoiceBox.getSelectionModel().selectedIndexProperty().addListener((ov, value, new_value) -> {
-            handleDeliveryModeChange((int) new_value);
+        creditCardSection.getCreditCardExpirationField().textProperty().addListener((observable, oldValue, newValue) -> {
+            validateField(creditCardSection.getCreditCardExpirationField(), EXP_DATE_REGEX, "Date d'expiration");
         });
 
-        CreditCardNumberField.textProperty().addListener((observable, oldValue, newValue) -> {
-            validateField(CreditCardNumberField, CREDIT_CARD_NUM_REGEX, "Numéro de carte de crédit");
+        creditCardSection.getCreditCardCVCField().textProperty().addListener((observable, oldValue, newValue) -> {
+            validateField(creditCardSection.getCreditCardCVCField(), CVC_REGEX, "Code de sécurité");
         });
 
-        CreditCardExpirationField.textProperty().addListener((observable, oldValue, newValue) -> {
-            validateField(CreditCardExpirationField, CREDIT_CARD_EXP_REGEX, "Expiration de la carte de crédit");
+        giftCardSection.getGiftCardNumberField().textProperty().addListener((observable, oldValue, newValue) -> {
+            validateField(giftCardSection.getGiftCardNumberField(), GIFT_CARD_REGEX, "Numéro de carte cadeau");
         });
 
-        CreditCardCVCField.textProperty().addListener((observable, oldValue, newValue) -> {
-            validateField(CreditCardExpirationField, CREDIT_CARD_CVC_REGEX, "Expiration de la carte de crédit");
+        deliveryAddressSection.getSameAdressesCheckbox().selectedProperty().addListener((observable, oldValue, newValue) -> {
+            handleSameAdressesChange(newValue);
         });
 
-        SameAdressesCheckbox.setOnAction(e -> {
-            handleSameAdressesChange();
+        deliveryAddressSection.getDeliveryAddressField().textProperty().addListener((ov, oldValue, newValue) -> {
+            handleSameAdressesChange(deliveryAddressSection.getSameAdressesCheckbox().isSelected());
         });
     }
 
@@ -85,65 +66,55 @@ public class MediateurFormulairePaiement implements Mediateur {
     public void handlePaymentModeChange(int index) {
         switch (index) {
             case 0: // Carte cadeau
-                CreditCardSection.setVisible(false);
-                CreditCardSection.setManaged(false);
-                GiftCardSection.setVisible(true);
-                GiftCardSection.setManaged(true);
-
-                toggleContactlessDeliveryOption();
+                creditCardSection.hideSection();
+                giftCardSection.showSection();
+                enableLivraisonPorte();
                 break;
             case 1: // Carte de crédit
-                CreditCardSection.setVisible(true);
-                CreditCardSection.setManaged(true);
-                GiftCardSection.setVisible(false);
-                GiftCardSection.setManaged(false);
-
-                toggleContactlessDeliveryOption();
+                creditCardSection.showSection();
+                giftCardSection.hideSection();
+                enableLivraisonPorte();
                 break;
             case 2: // Paiement à la livraison
-                CreditCardSection.setVisible(false);
-                CreditCardSection.setManaged(false);
-                GiftCardSection.setVisible(false);
-                GiftCardSection.setManaged(false);
-
-                this.DeliveryOptionChoiceBox.getItems().remove(2);
-                this.DeliveryOptionChoiceBox.setValue(DELIVERY_OPTIONS[0]);
+                creditCardSection.hideSection();
+                giftCardSection.hideSection();
+                disableLivraisonPorte();
                 break;
             default:
                 break;
         }
+        hideErrorMessage();
     }
 
-    private void toggleContactlessDeliveryOption() {
-        if (!this.DeliveryOptionChoiceBox.getItems().contains("Laisser à la porte")) {
-            this.DeliveryOptionChoiceBox.getItems().add(DELIVERY_OPTIONS[2]);
-        }
+    private void disableLivraisonPorte() {
+        if (this.formulaire.getDeliveryOptionChoiceBox().getItems().contains("Laisser à la porte"))
+            this.formulaire.getDeliveryOptionChoiceBox().getItems().remove("Laisser à la porte");
+    }
+
+    private void enableLivraisonPorte() {
+        if (!this.formulaire.getDeliveryOptionChoiceBox().getItems().contains("Laisser à la porte"))
+            this.formulaire.getDeliveryOptionChoiceBox().getItems().add("Laisser à la porte");
     }
 
     @Override
-    public void handleDeliveryModeChange(int index) {
-        
-    }
+    public void handleSameAdressesChange(boolean isSameAddress) {
+        if (isSameAddress) {
+            this.billingAddressSection.getBillingAddressField().setDisable(true);
+            this.billingAddressSection.getBillingAddressField().setText(this.deliveryAddressSection.getDeliveryAddressField().getText());
+        } else
+            this.billingAddressSection.getBillingAddressField().setDisable(false);
 
-    @Override
-    public void handleSameAdressesChange() {
-        BillingAddressTextField.setText(
-                SameAdressesCheckbox.isSelected() ?
-                    DeliveryAddressTextField.getText() : ""
-        );
-        BillingAddressSection.getContent().setDisable(!BillingAddressSection.getContent().isDisabled());
     }
 
     @Override
     public void displayErrorMessage(String field) {
         ErrorLabel.setVisible(true);
         ErrorLabel.setManaged(true);
-        ErrorLabel.setText("Le champ " + field + " est invalide. Veuillez réessayer.");
+        ErrorLabel.setText("Le champ '" + field + "' est invalide. Veuillez réessayer.");
     }
 
     @Override
     public void hideErrorMessage() {
-        System.out.println("HIDE ERROR MESSAGE");
         ErrorLabel.setVisible(false);
         ErrorLabel.setManaged(false);
         ErrorLabel.setText("");
